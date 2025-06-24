@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intent Chatbot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <button id="logout-btn">Logout</button>
+    <button id="clear-btn">Clear Chat</button>
+    <button id="dark-toggle">Dark</button>
+    <div class="chat-container">
+        <div id="chat-window" class="chat-window"></div>
+        <form id="chat-form" class="chat-form">
+            <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off" required />
+            <button type="submit">Send</button>
+        </form>
+    </div>
+    <script src="script.js"></script>
+    <script>
+    // Dark mode toggle for chat
+    const darkToggle = document.getElementById('dark-toggle');
+    darkToggle.onclick = function() {
+        document.body.classList.toggle('dark-mode');
+    };
+    </script>
+</body>
+</html> 

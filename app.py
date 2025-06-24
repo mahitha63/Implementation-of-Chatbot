@@ -1,138 +1,182 @@
 import os
 import json
-import datetime
-import csv
-import nltk
-import ssl
-import streamlit as st
-import random
+import sqlite3
+import re
+from flask import Flask, request, jsonify, session, redirect, url_for, send_from_directory
+from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+import random
 
-ssl._create_default_https_context = ssl._create_unverified_context
-nltk.data.path.append(os.path.abspath("nltk_data"))
-nltk.download('punkt')
+app = Flask(__name__, static_folder='static')
+app.secret_key = 'supersecretkey'  # Change in production
+DB_PATH = 'chatbot.db'
 
-# Load intents from the JSON file
-file_path = os.path.abspath("./intents.json")
-with open(file_path, "r") as file:
-    intents = json.load(file)
+# --- Database Setup ---
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            sender TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )''')
+        conn.commit()
+        # Create demo user if not exists
+        c.execute('SELECT * FROM users WHERE username=?', ('user',))
+        if not c.fetchone():
+            c.execute('INSERT INTO users (username, password) VALUES (?, ?)',
+                      ('user', generate_password_hash('password')))
+            conn.commit()
+init_db()
 
-# Create the vectorizer and classifier
-vectorizer = TfidfVectorizer(ngram_range=(1, 4))
-clf = LogisticRegression(random_state=0, max_iter=10000)
+# --- Preprocessing ---
+def preprocess(text):
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    return text
 
-# Preprocess the data
-tags = []
+# --- Intent Model Setup ---
+with open('intents.json', 'r') as f:
+    intents = json.load(f)
 patterns = []
+tags = []
 for intent in intents:
     for pattern in intent['patterns']:
+        patterns.append(preprocess(pattern))
         tags.append(intent['tag'])
-        patterns.append(pattern)
-
-# training the model
+vectorizer = TfidfVectorizer()
 x = vectorizer.fit_transform(patterns)
-y = tags
-clf.fit(x, y)
+clf = LogisticRegression(max_iter=1000)
+clf.fit(x, tags)
 
-def chatbot(input_text):
-    input_text = vectorizer.transform([input_text])
-    tag = clf.predict(input_text)[0]
+def predict_intent(text):
+    text = preprocess(text)
+    X = vectorizer.transform([text])
+    probs = clf.predict_proba(X)[0]
+    max_prob = max(probs)
+    tag = clf.classes_[probs.argmax()]
+    if max_prob < 0.1:
+        tag = 'fallback'
+    return tag
+
+def get_response(tag):
     for intent in intents:
         if intent['tag'] == tag:
-            response = random.choice(intent['responses'])
-            return response
-        
-counter = 0
+            return random.choice(intent['responses'])
+    return "Sorry, I didn't understand that."
 
-def main():
-    global counter
-    st.title("Intents of Chatbot using NLP")
+# --- Auth Helpers ---
+def is_logged_in():
+    return session.get('logged_in', False)
 
-    # Create a sidebar menu with options
-    menu = ["Home", "Conversation History", "About"]
-    choice = st.sidebar.selectbox("Menu", menu)
+def login_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not is_logged_in():
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
 
-    # Home Menu
-    if choice == "Home":
-        st.write("Hey buddy, Welcome to the chatbot. Please type a message and press Enter to start the conversation.")
+# --- Routes ---
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    if not username or not password:
+        return jsonify({'success': False, 'error': 'Username and password required.'})
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        try:
+            c.execute('INSERT INTO users (username, password) VALUES (?, ?)',
+                      (username, generate_password_hash(password)))
+            conn.commit()
+            return jsonify({'success': True})
+        except sqlite3.IntegrityError:
+            return jsonify({'success': False, 'error': 'Username already exists.'})
 
-        # Check if the chat_log.csv file exists, and if not, create it with column names
-        if not os.path.exists('chat_log.csv'):
-            with open('chat_log.csv', 'w', newline='', encoding='utf-8') as csvfile:
-                csv_writer = csv.writer(csvfile)
-                csv_writer.writerow(['User Input', 'Chatbot Response', 'Timestamp'])
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        data = request.get_json() if request.is_json else request.form
+        username = data.get('username')
+        password = data.get('password')
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('SELECT password FROM users WHERE username=?', (username,))
+            row = c.fetchone()
+            if row and check_password_hash(row[0], password):
+                session['logged_in'] = True
+                session['username'] = username
+                return jsonify({'success': True})
+            else:
+                return jsonify({'success': False, 'error': 'Invalid credentials'})
+    return send_from_directory('static', 'login.html')
 
-        counter += 1
-        user_input = st.text_input("You:", key=f"user_input_{counter}")
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
-        if user_input:
+@app.route('/')
+@login_required
+def index():
+    return send_from_directory('static', 'index.html')
 
-            # Convert the user input to a string
-            user_input_str = str(user_input)
+@app.route('/<path:path>')
+@login_required
+def static_files(path):
+    return send_from_directory('static', path)
 
-            response = chatbot(user_input)
-            st.text_area("Chatbot:", value=response, height=120, max_chars=None, key=f"chatbot_response_{counter}")
+@app.route('/chat', methods=['POST'])
+@login_required
+def chat():
+    data = request.get_json()
+    user_message = data.get('message', '')
+    username = session.get('username')
+    if not user_message:
+        return jsonify({'response': "Please enter a message."})
+    tag = predict_intent(user_message)
+    bot_reply = get_response(tag)
+    # Save user message and bot reply
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO history (username, sender, message) VALUES (?, ?, ?)",
+                  (username, 'user', user_message))
+        c.execute("INSERT INTO history (username, sender, message) VALUES (?, ?, ?)",
+                  (username, 'bot', bot_reply))
+        conn.commit()
+    return jsonify({'response': bot_reply})
 
-            # Get the current timestamp
-            timestamp = datetime.datetime.now().strftime(f"%Y-%m-%d %H:%M:%S")
+@app.route('/history', methods=['GET'])
+@login_required
+def history():
+    username = session.get('username')
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("SELECT sender, message, timestamp FROM history WHERE username=? ORDER BY id ASC", (username,))
+        rows = c.fetchall()
+    history = [{'sender': row[0], 'message': row[1], 'timestamp': row[2]} for row in rows]
+    return jsonify({'history': history})
 
-            # Save the user input and chatbot response to the chat_log.csv file
-            with open('chat_log.csv', 'a', newline='', encoding='utf-8') as csvfile:
-                csv_writer = csv.writer(csvfile)
-                csv_writer.writerow([user_input_str, response, timestamp])
-
-            if response.lower() in ['goodbye', 'bye']:
-                st.write("Thank you for chatting with me. Have a great day!")
-                st.stop()
-
-    # Conversation History Menu
-    elif choice == "Conversation History":
-        # Display the conversation history in a collapsible expander
-        st.header("Conversation History")
-        # with st.beta_expander("Click to see Conversation History"):
-        with open('chat_log.csv', 'r', encoding='utf-8') as csvfile:
-            csv_reader = csv.reader(csvfile)
-            next(csv_reader)  # Skip the header row
-            for row in csv_reader:
-                st.text(f"User: {row[0]}")
-                st.text(f"Chatbot: {row[1]}")
-                st.text(f"Timestamp: {row[2]}")
-                st.markdown("---")
-
-    elif choice == "About":
-        st.write("The goal of this project is to create a chatbot that can understand and respond to user input based on intents. The chatbot is built using Natural Language Processing (NLP) library and Logistic Regression, to extract the intents and entities from user input. The chatbot is built using Streamlit, a Python library for building interactive web applications.")
-
-        st.subheader("Project Overview:")
-
-        st.write("""
-        The project is divided into two parts:
-        1. NLP techniques and Logistic Regression algorithm is used to train the chatbot on labeled intents and entities.
-        2. For building the Chatbot interface, Streamlit web framework is used to build a web-based chatbot interface. The interface allows users to input text and receive responses from the chatbot.
-        """)
-
-        st.subheader("Dataset:")
-
-        st.write("""
-        The dataset used in this project is a collection of labelled intents and entities. The data is stored in a list.
-        - Intents: The intent of the user input (e.g. "greeting", "budget", "about")
-        - Entities: The entities extracted from user input (e.g. "Hi", "How do I create a budget?", "What is your purpose?")
-        - Text: The user input text.
-        """)
-
-        st.subheader("Streamlit Chatbot Interface:")
-
-        st.write("The chatbot interface is built using Streamlit. The interface includes a text input box for users to input their text and a chat window to display the chatbot's responses. The interface uses the trained model to generate responses to user input.")
-
-        st.subheader("Conclusion:")
-
-        st.write("In this project, a chatbot is built that can understand and respond to user input based on intents. The chatbot was trained using NLP and Logistic Regression, and the interface was built using Streamlit. This project can be extended by adding more data, using more sophisticated NLP techniques, deep learning algorithms.")
-
-        st.subheader("Developed by: ")
-        st.write("B.Mahitha")
-
-        st.subheader("Project Guide: ")
-        st.write("Aditya Prashant Ardak, Master Trainer, Edunet Foundation")
+@app.route('/clear_history', methods=['POST'])
+@login_required
+def clear_history():
+    username = session.get('username')
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM history WHERE username=?", (username,))
+        conn.commit()
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
-    main()
+    app.run(debug=True) 
