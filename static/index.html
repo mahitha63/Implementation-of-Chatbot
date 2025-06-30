@@ -10,12 +10,36 @@
     <button id="logout-btn">Logout</button>
     <button id="clear-btn">Clear Chat</button>
     <button id="dark-toggle">Dark</button>
+    <button id="export-btn">Export Chat</button>
+    <button id="minimize-btn" title="Minimize chat" class="minimize-btn">▁</button>
+    <button id="profile-btn" title="Profile" class="profile-btn">👤</button>
     <div class="chat-container">
+        <div class="chat-header">
+            <img src="https://thumbs.dreamstime.com/b/anime-girl-avatar-ai-generative-art-woman-273239948.jpg" alt="Bot Avatar" class="bot-avatar">
+            <span class="bot-name">IntentBot</span>
+        </div>
         <div id="chat-window" class="chat-window"></div>
         <form id="chat-form" class="chat-form">
+            <button type="button" id="emoji-btn" title="Insert emoji">😊</button>
             <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off" required />
             <button type="submit">Send</button>
         </form>
+        <div id="quick-replies" class="quick-replies"></div>
+    </div>
+    <audio id="notif-audio" src="notif.mp3" preload="auto" style="display:none"></audio>
+    <div id="profile-modal" class="profile-modal" style="display:none">
+        <div class="profile-modal-content">
+            <h2>User Profile</h2>
+            <label for="profile-name">Display Name:</label>
+            <input type="text" id="profile-name" maxlength="20" />
+            <label for="profile-avatar">Avatar:</label>
+            <input type="file" id="profile-avatar" accept="image/*" />
+            <div class="profile-avatar-preview" id="profile-avatar-preview"></div>
+            <div class="profile-modal-actions">
+                <button id="profile-save">Save</button>
+                <button id="profile-cancel">Cancel</button>
+            </div>
+        </div>
     </div>
     <script src="script.js"></script>
     <script>

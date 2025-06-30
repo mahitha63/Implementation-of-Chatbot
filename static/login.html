@@ -20,8 +20,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #3a1c71 0%, #bbc1eb 100%), url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80');
-            background-size: cover;
+            background: linear-gradient(135deg, #3a1c71 0%, #141a4e 100%), url('https://static.vecteezy.com/system/resources/previews/036/272/306/non_2x/blue-line-abstract-background-design-art-vector.jpg');
             background-position: center;
             transition: background 0.3s;
             position: relative;
@@ -33,26 +32,33 @@
         }
         .login-container {
             width: 370px;
-            background: rgba(78, 32, 75, 0.95);
-            border-radius: 12px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.18);
-            padding: 40px 36px 36px 36px;
+            background: rgba(164, 173, 255, 0.85);
+            border-radius: 18px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
+            padding: 44px 38px 38px 38px;
             transition: background 0.3s, color 0.3s;
             z-index: 2;
+            backdrop-filter: blur(10px) saturate(120%);
+            -webkit-backdrop-filter: blur(10px) saturate(120%);
         }
-        .login-container h2 { text-align: center; margin-bottom: 24px; }
-        .login-container input { width: 100%; padding: 15px 14px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 20px; font-size: 1rem; }
-        .login-container button[type="submit"] { width: 100%; background: #3a1c71; color: #fff; border: none; border-radius: 20px; padding: 12px 0; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
-        .login-container button[type="submit"]:hover { background: #85e6c5; color: #222; }
+        .login-container h2 { text-align: center; margin-bottom: 24px; letter-spacing: 1px; font-size: 2rem; }
+        .login-container input { width: 100%; padding: 15px 14px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 20px; font-size: 1rem; transition: border 0.2s, box-shadow 0.2s; background: rgba(255,255,255,0.85); }
+        .login-container input:focus { border-color: #3a1c71; box-shadow: 0 2px 8px #3a1c7133; outline: none; }
+        .login-container button[type="submit"] { width: 100%; background: #3a1c71; color: #fff; border: none; border-radius: 20px; padding: 12px 0; font-size: 1rem; cursor: pointer; transition: background 0.2s, box-shadow 0.2s, transform 0.15s; box-shadow: 0 2px 8px #3a1c7133; }
+        .login-container button[type="submit"]:hover { background: #85e6c5; color: #222; box-shadow: 0 4px 16px 0 rgba(58,28,113,0.12); transform: translateY(-2px) scale(1.04); }
         .error { color: #d8000c; text-align: center; margin-bottom: 12px; }
         body.dark-mode .login-container {
-            background: rgba(30, 30, 60, 0.97);
+            background: rgba(30, 30, 60, 0.92);
             color: #fff;
         }
         body.dark-mode .login-container input {
             background: #23234a;
             color: #fff;
             border: 1px solid #444;
+        }
+        body.dark-mode .login-container input:focus {
+            border-color: #85e6c5;
+            box-shadow: 0 2px 8px #85e6c533;
         }
         body.dark-mode .login-container button[type="submit"] {
             background: #bbc1eb;
@@ -89,6 +95,11 @@
             letter-spacing: 1px;
             text-align: center;
             z-index: 2;
+            animation: floatY 3s ease-in-out infinite alternate;
+        }
+        @keyframes floatY {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
         }
         .chatbot-desc {
             margin: 18px auto 0 auto;
