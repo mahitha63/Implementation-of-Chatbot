@@ -1,4 +1,4 @@
-# Intent-Based AI Chatbot
+# Intent-Based Chatbot
 
 A modern, full-featured intent-based chatbot web app with authentication, per-user chat history, dark mode, and a beautiful UI. Built with Java (HTTP server), vanilla HTML/CSS/JS, and a simple JSON-based intent system.
 
@@ -79,7 +79,7 @@ chatbot.db              # (Unused, legacy or for future use)
 
 ## License
 
-MIT (or specify your own)
+MIT
 
 ---
 
